@@ -84,7 +84,7 @@ public class SpringReactorDemoApplication implements CommandLineRunner {
     public void m5delayElements() throws InterruptedException {
         Flux.range(0, 10)
                 .delayElements(Duration.ofSeconds(2))
-                .doOnNext(x -> log.info("datos del arreglo:" + x))
+                .doOnNext(x -> log.info("Datos del arreglo:" + x))
                 .subscribe();
 
         Thread.sleep(22000);
