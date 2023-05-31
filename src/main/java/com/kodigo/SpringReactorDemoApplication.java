@@ -7,11 +7,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Predicate;
 
 @SpringBootApplication
@@ -166,17 +166,72 @@ public class SpringReactorDemoApplication implements CommandLineRunner {
     public void m12Error() {
 
         Flux<String> fx1 = Flux.fromIterable(dishes);
-       fx1.doOnNext(d->{
-           throw new ArithmeticException("Bad number");
-       })
-               //.onErrorReturn("error please reboot your system")
-               .onErrorMap(ex->new Exception(ex.getMessage()))
-               .subscribe(log::info);
+
+        fx1.doOnNext(d -> {
+                    throw new ArithmeticException("Bad number");
+                })
+                //.onErrorReturn("error please reboot your system")
+                .onErrorMap(ex -> new Exception(ex.getMessage()))
+                .subscribe(x -> log.info("Data " + x)); //.subscribe(log::info);
+
     }
 
-    @Override
-    public void run(String... args) throws Exception {
-        m12Error();
+    public void m13Threads() {
+        final Mono<String> mono = Mono.just("hello ");
+
+        // Esto genera un hilo Thread 1
+        Thread t = new Thread(() -> mono
+                .map(msg -> msg + "thread ")
+                .subscribe(v -> System.out.println(v + Thread.currentThread().getName()))
+        );
+
+        // todo a partir de aquí se usara el hilo main
+        System.out.println(Thread.currentThread().getName());
+        t.start();
+    }
+
+    public void m14PublishOn() {
+        Flux.range(1, 2)
+                .publishOn(Schedulers.boundedElastic())
+                .map(x -> {
+                    log.info("Valor " + x + " | Thread: " + Thread.currentThread().getName());
+                    return x;
+                })
+                //.publishOn(Schedulers.single()) // todo afecta que el proceso que este debajo de él, se ejecute en otro hilo, mejor tiempo de respuesta ya que los 2 procesos se ejecutan al mismo tiempo
+                .map(x -> {
+                    log.info("Valor " + x + " | Thread: " + Thread.currentThread().getName());
+                    return x;
+                })
+                .subscribe();
+    }
+
+    // subscribeOn afecta a los procesos que estan antes y después de el
+    // como salida tendremos 4 hilos boundedElastic
+    // en una cadena reactiva solo deberia tener un subscribeOn ya que si
+    // hubiera más estas no las tomaria en cuenta
+    public void m15SubscribeOn(){
+        Flux.range(1, 2)
+                .map(x -> {
+                    log.info("Valor " + x + " | Thread: " + Thread.currentThread().getName());
+                    return x;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(x -> {
+                    log.info("Valor " + x + " | Thread: " + Thread.currentThread().getName());
+                    return x;
+                })
+                .subscribe();
+    }
+
+    public void m17runOn(){
+        Flux.range(1, 8)
+                .parallel(8)
+                .runOn(Schedulers.parallel())
+                .map(x -> {
+                    log.info("Valor " + x + " | Thread: " + Thread.currentThread().getName());
+                    return x;
+                })
+                .subscribe();
     }
 
     public static void main(String[] args) {
@@ -184,6 +239,11 @@ public class SpringReactorDemoApplication implements CommandLineRunner {
         dishes.add("Pollo con papas");
 
         SpringApplication.run(SpringReactorDemoApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        m17runOn();
     }
 
 
